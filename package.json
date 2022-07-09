@@ -1,0 +1,32 @@
+{
+  "name": "basictypescripttemplate",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint . --ext .ts",
+    "lint-fix": "eslint . --ext .ts --fix",
+    "start": "node dist",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "try": "tsc && node dist"
+  },
+  "keywords": [],
+  "author": "kyzooghost",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^16.0.1",
+    "ethers": "^5.6.9",
+    "logger": "^0.0.1",
+    "typescript": "^4.6.4",
+    "winston": "^3.7.2"
+  },
+  "devDependencies": {
+    "@types/node": "^17.0.34",
+    "@typescript-eslint/eslint-plugin": "^5.30.5",
+    "@typescript-eslint/parser": "^5.30.5",
+    "eslint": "^8.19.0",
+    "eslint-plugin-prettier": "^4.2.1",
+    "prettier": "^2.7.1"
+  }
+}
