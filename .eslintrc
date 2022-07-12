@@ -8,10 +8,11 @@
   "extends": [
     "eslint:recommended",
     "plugin:@typescript-eslint/eslint-recommended",
-    "plugin:@typescript-eslint/recommended"
+    "plugin:@typescript-eslint/recommended",
+    "prettier"
   ],
-  rules: {
-    "comma-spacing": ["error", {before: false, after: true}],
-    "prettier/prettier": "error",
+  "rules": {
+    "comma-spacing": ["error", {"before": false, "after": true}],
+    "prettier/prettier": "error"
   },
 }

@@ -1,5 +1,7 @@
 import axios from 'axios';
-import { Contract, BigNumber, utils } from 'ethers';
+import { Contract, BigNumber, utils, ethers } from 'ethers';
+import TLP_ABI from '../abis/TLP.json';
+import { logger } from './';
 const { formatUnits } = utils;
 
 enum Platform {
@@ -8,13 +10,24 @@ enum Platform {
   aurora = 'aurora',
 }
 
-export async function convertBalanceKeyToUSDValue(
+const PLATFORM: { [chainID: number]: Platform } = {
+  [1]: Platform.ethereum,
+  [137]: Platform.polygon,
+  [1313161554]: Platform.aurora,
+};
+
+/**
+ * Given the TokenholderToBalance mapping for an LP token, returns same mapping with LP balance values converted to USD value
+ * @param map TokenholderToBalance mapping for an LP token, obtained from getTokenholderToBalanceMap() call
+ * @param contract: UniswapV2 LP contract object
+ */
+export async function convertUniswapLPBalanceToUSD(
   map: Map<string, BigNumber>,
   contract: Contract
 ): Promise<Map<string, number>> {
   const [totalSupply, totalSupplyUSDValue, decimals] = await Promise.all([
     contract.totalSupply(),
-    getUSDValueOfLPTokenTotalSupply(contract),
+    getUSDValueOfUniswapLPTokenTotalSupply(contract),
     contract.decimals(),
   ]);
 
@@ -23,35 +36,18 @@ export async function convertBalanceKeyToUSDValue(
   for (const [key, value] of map) {
     const formattedTLPBalance = parseFloat(formatUnits(value, decimals));
     const formattedTotalSupply = parseFloat(formatUnits(totalSupply, decimals));
-    holder_to_tlp_usd_value_map.set(key, (formattedTLPBalance * totalSupplyUSDValue) / formattedTotalSupply);
+    holder_to_tlp_usd_value_map.set(key, (totalSupplyUSDValue * formattedTLPBalance) / formattedTotalSupply);
   }
 
   return holder_to_tlp_usd_value_map;
 }
 
-async function fetchCoingeckoTokenPrice(token_address: string, platform: Platform) {
-  try {
-    const addr = token_address.toLowerCase();
-    const url = `https://api.coingecko.com/api/v3/simple/token_price/${platform}?contract_addresses=${token_address}&vs_currencies=usd`;
-    const data = await axios({
-      url: url,
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    const price = data.data[addr].usd;
-    return price ? price : -1;
-  } catch (e) {
-    console.log(`fetchCoingeckoTokenPrice, cannot fetch for ${token_address}`);
-    console.error(e);
-    return undefined;
-  }
-}
-
-// Gets USD value of total supply of an LP token
-async function getUSDValueOfLPTokenTotalSupply(lp_contract: Contract) {
+/**
+ * Gets USD value of total supply of a UniswapV2 LP token
+ * Fetches USD value of token0 + token1 balance
+ * @param lp_contract UniswapV2 LP contract object
+ */
+async function getUSDValueOfUniswapLPTokenTotalSupply(lp_contract: Contract) {
   const [token0_address, token1_address] = await Promise.all([lp_contract.token0(), lp_contract.token1()]);
   const { provider } = lp_contract;
   const [usdValueOfToken0InLP, usdValueOfToken1InLP] = await Promise.all([
@@ -71,10 +67,22 @@ async function getUSDValueOfLPTokenTotalSupply(lp_contract: Contract) {
   return totalUsdValueInLP;
 }
 
-async function getUSDValueOfERC20BalanceOfHolder(holder: string, token_address: string, provider: ) {
+/**
+ * Gets USD value of the balance of a single ERC20 token for a given holder
+ * @param holder EVM address of tokenholder
+ * @param token_address EVM address of ERC20 token
+ * @param provider ethers.providers.Provider type, required to query network
+ */
+async function getUSDValueOfERC20BalanceOfHolder(
+  holder: string,
+  token_address: string,
+  provider: ethers.providers.Provider
+): Promise<number> {
   try {
-    const erc20_contract = new ethers.Contract(token_address, SLP, provider);
-    const { chainId } = erc20_contract.provider._network;
+    const erc20_contract = new Contract(token_address, TLP_ABI, provider);
+
+    const network = await erc20_contract.provider.getNetwork();
+    const { chainId } = network;
 
     const [balance, decimals, priceInUSD] = await Promise.all([
       erc20_contract.balanceOf(holder),
@@ -86,10 +94,36 @@ async function getUSDValueOfERC20BalanceOfHolder(holder: string, token_address: 
     const valueInUSD = parseFloat(formattedBalance) * priceInUSD;
     return valueInUSD;
   } catch (e) {
-    console.log(
+    logger.error(
       `getUSDValueOfERC20BalanceOfHolder, cannot get USD value of ${token_address} holdings for holder ${holder}`
     );
-    console.error(e);
-    return undefined;
+    logger.error(e);
+    return 0;
+  }
+}
+
+/**
+ * Fetch coingecko price for a given token
+ * @param token_address EVM address of ERC20 token
+ * @param platform Network of ERC20 token
+ */
+async function fetchCoingeckoTokenPrice(token_address: string, platform: Platform): Promise<number> {
+  try {
+    const addr = token_address.toLowerCase();
+    const url = `https://api.coingecko.com/api/v3/simple/token_price/${platform}?contract_addresses=${token_address}&vs_currencies=usd`;
+    const data = await axios({
+      url: url,
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const price = data.data[addr].usd;
+    return price ? price : 0;
+  } catch (e) {
+    logger.error(`fetchCoingeckoTokenPrice, cannot fetch for ${token_address}`);
+    logger.error(e);
+    return 0;
   }
 }

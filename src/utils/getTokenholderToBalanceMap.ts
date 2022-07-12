@@ -1,5 +1,6 @@
 import { Contract, Event, EventFilter, BigNumber } from 'ethers';
 import { ZERO, ZERO_ADDRESS } from '../constants';
+import { logger, fetchEvents } from './';
 
 // Contract must inherit ERC20.sol
 export async function getTokenholderToBalanceMap(contract: Contract): Promise<Map<string, BigNumber>> {
@@ -67,43 +68,6 @@ export async function getTokenholderToBalanceMap(contract: Contract): Promise<Ma
 
   // Delete zero address
   holders_map.delete(ZERO_ADDRESS);
-
+  logger.info(`Successfully fetched tokenholder to balance map for ${contract.address}`);
   return holders_map;
-}
-
-async function fetchEvents(
-  contract: Contract,
-  eventFilter: EventFilter,
-  startBlock: number,
-  endBlock: number
-): Promise<Array<Event>> {
-  if (endBlock == -1) endBlock = await contract.provider.getBlockNumber();
-
-  try {
-    const events = await contract.queryFilter(eventFilter, startBlock, endBlock);
-    return events;
-  } catch (e) {
-    let errorString = 'Unknown Error';
-    if (e instanceof Error) errorString = e.toString();
-
-    if (
-      !errorString.includes('10K') &&
-      !errorString.includes('1000 results') &&
-      !errorString.includes('statement timeout')
-    ) {
-      console.error(e);
-      throw e;
-    }
-
-    // log response size exceeded. recurse down
-    const midBlock = Math.floor((startBlock + endBlock) / 2);
-
-    const [left, right] = await Promise.all([
-      fetchEvents(contract, eventFilter, startBlock, midBlock),
-      fetchEvents(contract, eventFilter, midBlock + 1, endBlock),
-    ]);
-
-    const res = left.concat(right);
-    return res;
-  }
 }

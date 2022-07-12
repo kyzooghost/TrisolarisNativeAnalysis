@@ -1,12 +1,10 @@
-import TLP_ABI from './abis/TLP.json';
-import { ethers } from 'ethers';
-import { AURORA_PROVIDER } from './constants';
-import { getTokenholderToBalanceMap } from './utils';
-const contract = new ethers.Contract('0x501acE9c35E60f03A2af4d484f49F9B1EFde9f40', TLP_ABI, AURORA_PROVIDER);
+import { getTrisolarisLPHolderToUSDMap, getTokenholderToBalanceMap, getMasterchefStakers } from './utils';
+import { TLP_ADDRESS_LIST } from './constants';
 
 async function main() {
   console.time('script_run_time');
-  console.log(await getTokenholderToBalanceMap(contract));
+  // return await getTrisolarisLPHolderToUSDMap(TLP_ADDRESS_LIST[0]);
+  return await getMasterchefStakers('0x20F8AeFB5697B77E0BB835A8518BE70775cdA1b0');
 }
 
 main()
